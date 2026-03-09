@@ -1,8 +1,9 @@
-import { useRef } from 'react';
+import { useRef, useEffect } from 'react';
 import { HotTable, HotTableClass } from '@handsontable/react';
 import { registerAllModules } from 'handsontable/registry';
 import { HyperFormula } from 'hyperformula';
 import { CellValue } from 'handsontable/common';
+import Handsontable from 'handsontable';
 import 'handsontable/dist/handsontable.full.min.css';
 
 registerAllModules();
@@ -17,7 +18,7 @@ const initialData: CellValue[][] = [
 ];
 
 const isNum = (v: CellValue): boolean =>
-  v !== '' && v !== null && !isNaN(Number(v));
+  v !== '' && v !== null && v !== undefined && !isNaN(Number(v));
 
 const getLinearStep = (nums: number[]): number | null => {
   if (nums.length < 2) return null;
@@ -26,96 +27,82 @@ const getLinearStep = (nums: number[]): number | null => {
   return isLinear ? step : null;
 };
 
-const beforeAutofill = (
-  selectionData: CellValue[][],
-  sourceRange: { from: { row: number; col: number }; to: { row: number; col: number } },
-  targetRange: { from: { row: number; col: number }; to: { row: number; col: number } },
-  direction: 'up' | 'down' | 'left' | 'right'
-): CellValue[][] | void => {
-  const fillDown = (data: CellValue[][], rows: number): CellValue[][] => {
-    const numCols = data[0].length;
-    const result: CellValue[][] = Array.from({ length: rows }, () => Array(numCols).fill(''));
-    for (let c = 0; c < numCols; c++) {
-      const colValues = data.map(row => row[c]);
-      if (colValues.every(isNum)) {
-        const nums = colValues.map(Number);
-        const step = getLinearStep(nums);
-        if (step !== null) {
-          let last = nums[nums.length - 1];
-          for (let r = 0; r < rows; r++) result[r][c] = (last += step);
-          continue;
-        }
-      }
-      for (let r = 0; r < rows; r++) result[r][c] = colValues[r % colValues.length];
-    }
-    return result;
-  };
-
-  const fillUp = (data: CellValue[][], rows: number): CellValue[][] => {
-    const numCols = data[0].length;
-    const result: CellValue[][] = Array.from({ length: rows }, () => Array(numCols).fill(''));
-    for (let c = 0; c < numCols; c++) {
-      const colValues = data.map(row => row[c]);
-      if (colValues.every(isNum)) {
-        const nums = colValues.map(Number);
-        const step = getLinearStep(nums);
-        if (step !== null) {
-          let first = nums[0];
-          for (let r = rows - 1; r >= 0; r--) result[r][c] = (first -= step);
-          continue;
-        }
-      }
-      for (let r = 0; r < rows; r++) result[r][c] = colValues[r % colValues.length];
-    }
-    return result;
-  };
-
-  const fillRight = (data: CellValue[][], cols: number): CellValue[][] => {
-    const numRows = data.length;
-    const result: CellValue[][] = Array.from({ length: numRows }, () => Array(cols).fill(''));
-    for (let r = 0; r < numRows; r++) {
-      const rowValues = data[r];
-      if (rowValues.every(isNum)) {
-        const nums = rowValues.map(Number);
-        const step = getLinearStep(nums);
-        if (step !== null) {
-          let last = nums[nums.length - 1];
-          for (let c = 0; c < cols; c++) result[r][c] = (last += step);
-          continue;
-        }
-      }
-      for (let c = 0; c < cols; c++) result[r][c] = rowValues[c % rowValues.length];
-    }
-    return result;
-  };
-
-  const fillLeft = (data: CellValue[][], cols: number): CellValue[][] => {
-    const numRows = data.length;
-    const result: CellValue[][] = Array.from({ length: numRows }, () => Array(cols).fill(''));
-    for (let r = 0; r < numRows; r++) {
-      const rowValues = data[r];
-      if (rowValues.every(isNum)) {
-        const nums = rowValues.map(Number);
-        const step = getLinearStep(nums);
-        if (step !== null) {
-          let first = nums[0];
-          for (let c = cols - 1; c >= 0; c--) result[r][c] = (first -= step);
-          continue;
-        }
-      }
-      for (let c = 0; c < cols; c++) result[r][c] = rowValues[c % rowValues.length];
-    }
-    return result;
-  };
-
-  if (direction === 'down') return fillDown(selectionData, targetRange.to.row - targetRange.from.row + 1);
-  if (direction === 'up') return fillUp(selectionData, targetRange.to.row - targetRange.from.row + 1);
-  if (direction === 'right') return fillRight(selectionData, targetRange.to.col - targetRange.from.col + 1);
-  if (direction === 'left') return fillLeft(selectionData, targetRange.to.col - targetRange.from.col + 1);
-};
-
 function App() {
   const hotRef = useRef<HotTableClass>(null);
+
+  useEffect(() => {
+    const hot = hotRef.current?.hotInstance;
+    if (!hot) return;
+
+    const handleAutofill = (
+      selectionData: CellValue[][],
+      _sourceRange: Handsontable.CellRange,
+      targetRange: Handsontable.CellRange,
+      direction: string
+    ): CellValue[][] => {
+      const tFrom = targetRange.getTopStartCorner();
+      const tTo = targetRange.getBottomEndCorner();
+      const fillRows = tTo.row - tFrom.row + 1;
+      const fillCols = tTo.col - tFrom.col + 1;
+
+      if (direction === 'down' || direction === 'up') {
+        const numCols = selectionData[0]?.length ?? 0;
+        const result: CellValue[][] = Array.from({ length: fillRows }, () => Array(numCols).fill(''));
+        for (let c = 0; c < numCols; c++) {
+          const colValues = selectionData.map(row => row[c]);
+          if (colValues.every(isNum)) {
+            const nums = colValues.map(Number);
+            const step = getLinearStep(nums);
+            if (step !== null) {
+              if (direction === 'down') {
+                let last = nums[nums.length - 1];
+                for (let r = 0; r < fillRows; r++) result[r][c] = (last += step);
+              } else {
+                let first = nums[0];
+                const seq: number[] = [];
+                for (let r = 0; r < fillRows; r++) seq.unshift((first -= step));
+                seq.forEach((v, r) => { result[r][c] = v; });
+              }
+              continue;
+            }
+          }
+          for (let r = 0; r < fillRows; r++) result[r][c] = colValues[r % colValues.length];
+        }
+        return result;
+      }
+
+      if (direction === 'right' || direction === 'left') {
+        const numRows = selectionData.length;
+        const result: CellValue[][] = Array.from({ length: numRows }, () => Array(fillCols).fill(''));
+        for (let r = 0; r < numRows; r++) {
+          const rowValues = selectionData[r];
+          if (rowValues.every(isNum)) {
+            const nums = rowValues.map(Number);
+            const step = getLinearStep(nums);
+            if (step !== null) {
+              if (direction === 'right') {
+                let last = nums[nums.length - 1];
+                for (let c = 0; c < fillCols; c++) result[r][c] = (last += step);
+              } else {
+                let first = nums[0];
+                const seq: number[] = [];
+                for (let c = 0; c < fillCols; c++) seq.unshift((first -= step));
+                seq.forEach((v, c) => { result[r][c] = v; });
+              }
+              continue;
+            }
+          }
+          for (let c = 0; c < fillCols; c++) result[r][c] = rowValues[c % rowValues.length];
+        }
+        return result;
+      }
+
+      return selectionData;
+    };
+
+    hot.addHook('beforeAutofill', handleAutofill as any);
+    return () => { hot.removeHook('beforeAutofill', handleAutofill as any); };
+  }, []);
 
   const addRow = (): void => {
     const hot = hotRef.current?.hotInstance;
@@ -142,7 +129,6 @@ function App() {
         height="auto"
         contextMenu={true}
         fillHandle={{ autoInsertRow: true }}
-        beforeAutofill={beforeAutofill as any}
         formulas={{ engine: HyperFormula }}
         licenseKey="non-commercial-and-evaluation"
       />
