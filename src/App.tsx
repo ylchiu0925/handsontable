@@ -101,7 +101,6 @@ function App() {
     };
 
     hot.addHook('beforeAutofill', handleAutofill as any);
-    return () => { hot.removeHook('beforeAutofill', handleAutofill as any); };
   }, []);
 
   const addRow = (): void => {
