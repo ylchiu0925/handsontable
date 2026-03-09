@@ -1,6 +1,7 @@
 import { useRef } from 'react';
 import { HotTable } from '@handsontable/react';
 import { registerAllModules } from 'handsontable/registry';
+import { HyperFormula } from 'hyperformula';
 import 'handsontable/dist/handsontable.full.min.css';
 
 registerAllModules();
@@ -10,7 +11,10 @@ const initialData = [
   ['2019', 10, 11, 12, 13],
   ['2020', 20, 11, 14, 13],
   ['2021', 30, 15, 12, 13],
+  ['SUM', '=SUM(B2:B4)', '=SUM(C2:C4)', '=SUM(D2:D4)', '=SUM(E2:E4)'],
+  ['AVERAGE', '=AVERAGE(B2:B4)', '=AVERAGE(C2:C4)', '=AVERAGE(D2:D4)', '=AVERAGE(E2:E4)'],
 ];
+
 
 const isNum = v => v !== '' && v !== null && !isNaN(Number(v));
 
@@ -136,6 +140,7 @@ function App() {
         contextMenu={true}
         fillHandle={{ autoInsertRow: true }}
         beforeAutofill={beforeAutofill}
+        formulas={{ engine: HyperFormula, licenseKey: 'internal-use-in-handsontable' }}
         licenseKey="non-commercial-and-evaluation"
       />
     </div>
