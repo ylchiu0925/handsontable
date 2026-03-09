@@ -129,6 +129,9 @@ function App() {
         height="auto"
         contextMenu={true}
         fillHandle={{ autoInsertRow: true }}
+        filters={true}
+        dropdownMenu={true}
+        columnSorting={true}
         formulas={{ engine: HyperFormula }}
         licenseKey="non-commercial-and-evaluation"
       />
